@@ -285,6 +285,13 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // OPDS server list. Persisted via a category-less SettingInfo::String in
   // SettingsList.h, so it stays out of the on-device Settings screen.
   char opdsDownloadFolder[64] = "";
+
+  // Automated book delivery: fetch one EPUB a day from a fixed URL, saved as
+  // /YYYY-MM-DD.epub in the SD root. The local day comes from the clock's
+  // configured timezone, so no offset is stored here - see util/Timezones.
+  uint8_t bookDeliveryEnabled = 0;  // 0 = disabled, 1 = enabled
+  uint8_t deliveryHour = 6;         // Local hour to fetch at (0-23)
+  char bookDeliveryUrl[256] = "";   // URL serving the current EPUB
   // On-disk filename format for OPDS downloads (0=Author-Title default, 1=Title-Author,
   // 2=Title). See OpdsFilenameFormat. Persisted via a category-less SettingInfo::Enum,
   // edited from the OPDS server list; hidden from the on-device Settings screen.

@@ -24,6 +24,7 @@ enum class SettingAction {
   RebuildLibraryIndex,
   CheckForUpdates,
   SdFirmwareUpdate,
+  BookDeliveryNow,
   Language,
   DownloadFonts,
   TextSettings,

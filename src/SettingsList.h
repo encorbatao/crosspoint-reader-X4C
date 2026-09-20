@@ -357,6 +357,17 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         SettingInfo::Toggle(StrId::STR_MOVE_FINISHED_TO_READ, &CrossPointSettings::moveFinishedToReadFolder,
                             "moveFinishedToReadFolder", StrId::STR_CAT_SYSTEM),
 
+#if FREEINK_CAP_RTC
+        // Automated book delivery. Gated on the RTC capability: without a clock
+        // there is no local date to schedule against or to name the file after.
+        SettingInfo::Toggle(StrId::STR_BOOK_DELIVERY_ENABLED, &CrossPointSettings::bookDeliveryEnabled,
+                            "bookDeliveryEnabled", StrId::STR_CAT_SYSTEM),
+        SettingInfo::Value(StrId::STR_DELIVERY_HOUR, &CrossPointSettings::deliveryHour, {0, 23, 1}, "deliveryHour",
+                           StrId::STR_CAT_SYSTEM),
+        SettingInfo::String(StrId::STR_BOOK_URL, &SETTINGS.bookDeliveryUrl[0], sizeof(SETTINGS.bookDeliveryUrl),
+                            "bookDeliveryUrl", StrId::STR_CAT_SYSTEM),
+#endif
+
         // OPDS download folder: persisted + web-exposed, but category-less so it
         // is hidden from the on-device Settings screen (edited via OPDS UI).
         SettingInfo::String(StrId::STR_OPDS_DOWNLOAD_FOLDER, &SETTINGS.opdsDownloadFolder[0],
