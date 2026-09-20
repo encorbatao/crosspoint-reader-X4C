@@ -30,6 +30,11 @@ namespace {
 constexpr int SIDE_PADDING = 12;
 constexpr unsigned long LONG_PRESS_MS = 1000;
 
+// File-type icon drawn at the start of every book row, and the gap after it.
+// Subtracted from the row width to work out how much a title gets.
+constexpr int ROW_ICON_SIZE = 32;
+constexpr int ROW_ICON_GAP = 8;
+
 constexpr int RECENT_TAB = 0;
 constexpr int TITLE_TAB = 1;
 constexpr int AUTHOR_TAB = 2;
@@ -716,7 +721,10 @@ void LibraryListActivity::buildRows(UiScreen& screen) {
   props.action = ACTION_ROW;
   props.inputMask = fui::InputTouch | fui::InputLongPress;
   props.labelText = screen.theme().bodyText;
-  props.labelText.maxLines = 1;
+  // Long titles wrap onto the row's second line instead of being clipped. The
+  // row is already two lines tall (it was sized for title + author), so the
+  // author gives up its line on the rows that need it - see below.
+  props.labelText.maxLines = 2;
   // Breathing room between rows; the dense theme default packs the two-line
   // rows edge-to-edge.
   props.rowGap = std::max<int16_t>(screen.theme().listRowGap, 6);
@@ -730,6 +738,13 @@ void LibraryListActivity::buildRows(UiScreen& screen) {
   if (!groupsCollapsed && winHeaders.size() < cap) winHeaders.resize(cap);
   winItems.clear();
   if (winItems.capacity() < cap) winItems.reserve(cap);
+
+  // Width a title gets before it wraps: the row less its text inset and, on
+  // book rows, the file-type icon. Used only to decide whether the author still
+  // has a line to live on - the widget does the actual wrapping.
+  const auto rowBody = screen.body();
+  const int labelWidth =
+      rowBody.width - 2 * screen.theme().listSidePadding - (groupsCollapsed ? 0 : ROW_ICON_SIZE + ROW_ICON_GAP);
 
   int rows = 0;
   int headers = 0;
@@ -769,12 +784,15 @@ void LibraryListActivity::buildRows(UiScreen& screen) {
           formatInitialHeading(initial, heading);
         item.sectionHeading = heading.c_str();
       }
-      if (!authorGrouped && !author.empty()) item.subtitle = author.c_str();
+      // A title that needs both lines displaces the author: a complete title
+      // is worth more than an author the sort header often already shows.
+      const bool titleFitsOneLine = renderer.getTextWidth(props.labelText.font, title.c_str()) <= labelWidth;
+      if (!authorGrouped && !author.empty() && titleFitsOneLine) item.subtitle = author.c_str();
     }
 
     item.label = title.c_str();
     // Group headings stay bare; every book row gets its file-type icon.
-    if (!groupsCollapsed && !rowFile.empty()) item.icon = listIconFor(UITheme::getFileIcon(rowFile), 32);
+    if (!groupsCollapsed && !rowFile.empty()) item.icon = listIconFor(UITheme::getFileIcon(rowFile), ROW_ICON_SIZE);
     item.actionValue = static_cast<int16_t>(entry);
     winItems.push_back(item);
     rows++;
