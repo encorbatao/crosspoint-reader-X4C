@@ -23,6 +23,9 @@ class CrossPointState : public PersistableStore<CrossPointState> {
   uint8_t readerActivityLoadCount = 0;
   bool lastSleepFromReader = false;
   bool showBootScreen = true;
+  // UTC epoch of the last successful book delivery. Compared by LOCAL date, so
+  // a second power-up on the same day does no work at all.
+  uint32_t lastDeliveryFetch = 0;
 
   static const char* getFilePath() { return "/.crosspoint/state.json"; }
   void toJson(JsonDocument& doc) const;

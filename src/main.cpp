@@ -31,12 +31,14 @@
 #include "SdCardFontSystem.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
+#include "activities/delivery/BookDeliveryActivity.h"
 #include "activities/settings/SdFirmwareUpdateActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "images/LoadingIcon.h"
 #include "platform/UsbSerialJtagHandoff.h"
 #include "util/ButtonNavigator.h"
+#include "util/DeliverySchedule.h"
 #include "util/ScreenshotUtil.h"
 #include "util/Timezones.h"
 
@@ -559,6 +561,21 @@ void setup() {
     APP_STATE.readerActivityLoadCount++;
     APP_STATE.saveToFile();
     activityManager.goToReader(path, allowFastInitialReaderRefresh);
+  }
+
+  // A delivery came due while the device was off. Pushed on top of the screen
+  // the routing above chose, so finishing it reveals that screen rather than
+  // having to re-derive it here. Skipped on a silent reboot, which is a
+  // continuation of the previous session rather than a fresh power-up.
+  if (resume != BootResume::Silent && SETTINGS.bookDeliveryEnabled && strlen(SETTINGS.bookDeliveryUrl) > 0 &&
+      halClock.isAvailable()) {
+    time_t now = 0;
+    time(&now);
+    if (DeliverySchedule::isDue(now, APP_STATE.lastDeliveryFetch, SETTINGS.deliveryHour)) {
+      LOG_INF("MAIN", "Book delivery owed, catching up before handing over");
+      activityManager.pushActivity(
+          std::make_unique<BookDeliveryActivity>(renderer, mappedInputManager, DeliveryTrigger::CatchUp));
+    }
   }
 
   if (resume == BootResume::Silent) {

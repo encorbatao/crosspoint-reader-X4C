@@ -32,6 +32,7 @@
 #include "SilentRestart.h"
 #include "StatusBarSettingsActivity.h"
 #include "TextSettingsActivity.h"
+#include "activities/delivery/BookDeliveryActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
 #include "components/UITheme.h"
@@ -100,6 +101,9 @@ void SettingsActivity::rebuildSettingsLists() {
   // clockless boards there is nothing to set.
   if (halClock.isAvailable()) {
     systemSettings.push_back(SettingInfo::Action(StrId::STR_CLOCK, SettingAction::ClockSettings));
+    // Same gate as the delivery settings rows: no clock, no local date to
+    // schedule against or to name the downloaded file after.
+    systemSettings.push_back(SettingInfo::Action(StrId::STR_DOWNLOAD_NOW, SettingAction::BookDeliveryNow));
   }
   systemSettings.push_back(SettingInfo::Action(StrId::STR_KOREADER_SYNC, SettingAction::KOReaderSync));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_OPDS_SERVERS, SettingAction::OPDSBrowser));
@@ -403,6 +407,10 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
       case SettingAction::CheckForUpdates:
         startActivityForResult(std::make_unique<OtaUpdateActivity>(renderer, mappedInput), resultHandler);
+        break;
+      case SettingAction::BookDeliveryNow:
+        startActivityForResult(std::make_unique<BookDeliveryActivity>(renderer, mappedInput, DeliveryTrigger::Manual),
+                               resultHandler);
         break;
       case SettingAction::SdFirmwareUpdate:
         startActivityForResult(std::make_unique<SdFirmwareUpdateActivity>(renderer, mappedInput), resultHandler);
