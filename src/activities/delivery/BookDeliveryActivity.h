@@ -2,6 +2,8 @@
 
 #include <I18n.h>
 
+#include <string>
+
 #include "activities/Activity.h"
 
 /**
@@ -37,6 +39,9 @@ class BookDeliveryActivity final : public Activity {
   enum State { Connecting, Working, Finished };
 
   const DeliveryTrigger trigger;
+  // Today's book on the SD card, set once it is verified and in place. Empty
+  // until then, so a failed run never opens a stale file.
+  std::string deliveredPath;
   State state = Working;
   StrId outcome = StrId::STR_DELIVERY_DOWNLOADING;
   bool succeeded = false;

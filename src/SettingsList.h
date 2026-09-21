@@ -366,6 +366,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                            StrId::STR_CAT_SYSTEM),
         SettingInfo::String(StrId::STR_BOOK_URL, &SETTINGS.bookDeliveryUrl[0], sizeof(SETTINGS.bookDeliveryUrl),
                             "bookDeliveryUrl", StrId::STR_CAT_SYSTEM),
+        SettingInfo::Toggle(StrId::STR_OPEN_AFTER_DOWNLOAD, &CrossPointSettings::openDeliveredBook, "openDeliveredBook",
+                            StrId::STR_CAT_SYSTEM),
 #endif
 
         // OPDS download folder: persisted + web-exposed, but category-less so it
