@@ -138,6 +138,17 @@ int RoundedRaffTheme::getMenuRowHeight(const GfxRenderer& renderer) const {
   return renderer.getLineHeight(kTitleFontId) + 20;  // 10px top + 10px bottom
 }
 
+BaseTheme::MenuLayout RoundedRaffTheme::getMenuLayout(const GfxRenderer& renderer, const Rect rect, int) const {
+  MenuLayout layout{};
+  layout.rowHeight = getMenuRowHeight(renderer);
+  layout.rowStep = layout.rowHeight + kSelectableRowGap;
+  layout.rowsPerColumn = std::max(1, rect.height / layout.rowStep);
+  layout.columnCount = 1;
+  layout.columnWidth = rect.width;
+
+  return layout;
+}
+
 void RoundedRaffTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                                       const std::function<std::string(int index)>& buttonLabel,
                                       const std::function<UIIcon(int index)>& rowIcon) const {

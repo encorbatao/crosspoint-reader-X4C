@@ -315,11 +315,14 @@ void LyraTheme::drawEmptyRecents(const GfxRenderer& renderer, const Rect rect) c
 void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                                const std::function<std::string(int index)>& buttonLabel,
                                const std::function<UIIcon(int index)>& rowIcon) const {
+  const MenuLayout layout = getMenuLayout(renderer, rect, buttonCount);
+
   for (int i = 0; i < buttonCount; ++i) {
-    int tileWidth = rect.width - LyraMetrics::values.contentSidePadding * 2;
-    Rect tileRect = Rect{rect.x + LyraMetrics::values.contentSidePadding,
-                         rect.y + i * (LyraMetrics::values.menuRowHeight + LyraMetrics::values.menuSpacing), tileWidth,
-                         LyraMetrics::values.menuRowHeight};
+    const int column = i / layout.rowsPerColumn;
+    const int row = i % layout.rowsPerColumn;
+    int tileWidth = layout.columnWidth - LyraMetrics::values.contentSidePadding * 2;
+    Rect tileRect = Rect{rect.x + column * layout.columnWidth + LyraMetrics::values.contentSidePadding,
+                         rect.y + row * layout.rowStep, tileWidth, layout.rowHeight};
 
     const bool selected = selectedIndex == i;
 
@@ -327,11 +330,10 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
       renderer.fillRoundedRect(tileRect.x, tileRect.y, tileRect.width, tileRect.height, cornerRadius, Color::LightGray);
     }
 
-    std::string labelStr = buttonLabel(i);
-    const char* label = labelStr.c_str();
+    const std::string labelStr = buttonLabel(i);
     int textX = tileRect.x + 16;
     const int lineHeight = renderer.getLineHeight(UI_12_FONT_ID);
-    const int textY = tileRect.y + (LyraMetrics::values.menuRowHeight - lineHeight) / 2;
+    const int textY = tileRect.y + (layout.rowHeight - lineHeight) / 2;
 
     if (rowIcon != nullptr) {
       UIIcon icon = rowIcon(i);
@@ -342,6 +344,10 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
       }
     }
 
-    renderer.drawText(UI_12_FONT_ID, textX, textY, label, true);
+    // A two-column menu leaves half the width per label; clip rather than let
+    // a long one bleed into the neighbouring column.
+    const int maxLabelWidth = std::max(0, tileRect.x + tileRect.width - hPaddingInSelection - textX);
+    const std::string label = renderer.truncatedText(UI_12_FONT_ID, labelStr.c_str(), maxLabelWidth);
+    renderer.drawText(UI_12_FONT_ID, textX, textY, label.c_str(), true);
   }
 }

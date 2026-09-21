@@ -237,6 +237,20 @@ class BaseTheme {
   // grid from this, so hit bands always match the visuals (RoundedRaff derives
   // its row height from the font, not the metrics table).
   virtual int getMenuRowHeight(const GfxRenderer& renderer) const;
+
+  // Geometry of the home button menu, shared by the theme that draws it and by
+  // HomeActivity's touch grid so the two can never disagree. Items fill the
+  // left column top-down and spill into the right one, which keeps the
+  // selection order linear: Up/Down walks off the bottom of one column and
+  // continues at the top of the next.
+  struct MenuLayout {
+    int rowHeight;
+    int rowStep;        // rowHeight plus the gap below it
+    int rowsPerColumn;  // how many rows fit in the band
+    int columnCount;
+    int columnWidth;
+  };
+  virtual MenuLayout getMenuLayout(const GfxRenderer& renderer, Rect rect, int buttonCount) const;
   // Also draws the wall clock opposite the battery when the user enabled
   // SETTINGS.clockShowInHeader and an RTC is present.
   virtual void drawHeader(const GfxRenderer& renderer, Rect rect, const char* title,

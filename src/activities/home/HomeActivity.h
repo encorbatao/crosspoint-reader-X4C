@@ -69,6 +69,9 @@ class HomeActivity final : public Activity {
   void onBookDeliveryOpen();
 
   int getMenuItemCount() const;
+  // Band the button menu is drawn in: from below the cover tile down to the
+  // button hints. Shared by render() and the touch grid.
+  Rect getMenuBandRect() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image
   bool restoreCoverBuffer();  // Restore frame buffer from stored cover
   void freeCoverBuffer();     // Free the stored cover buffer

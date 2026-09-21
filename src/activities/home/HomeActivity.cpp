@@ -36,6 +36,13 @@ int HomeActivity::getMenuItemCount() const {
   return count;
 }
 
+Rect HomeActivity::getMenuBandRect() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int menuTop = metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset;
+
+  return Rect{0, menuTop, renderer.getScreenWidth(), renderer.getScreenHeight() - metrics.buttonHintsHeight - menuTop};
+}
+
 void HomeActivity::loadRecentBooks(int maxBooks) {
   recentBooks.clear();
   const auto& books = RECENT_BOOKS.getBooks();
@@ -260,18 +267,31 @@ void HomeActivity::loop() {
     return;
   }
 
-  const int menuTop = metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset;
+  const Rect menuBand = getMenuBandRect();
   const int renderedMenuCount =
       menuCount - (metrics.homeContinueReadingInMenu ? 0 : static_cast<int>(recentBooks.size()));
-  int menuRow = -1;
-  // Row height from the theme, not the metrics table: RoundedRaff draws
-  // font-derived rows and the touch grid must match the visuals exactly.
-  const int menuRowHeight = GUI.getMenuRowHeight(renderer);
-  const auto menuTouch = mappedInput.rowTouch(menuRow, menuTop, menuRowHeight + metrics.menuSpacing, renderedMenuCount,
-                                              0, INT32_MAX, menuRowHeight);
-  if (menuTouch != MappedInputManager::RowTouch::None) {
+  // Geometry from the theme, not the metrics table: RoundedRaff draws
+  // font-derived rows, and a menu too long for one column spills into a second.
+  const auto layout = GUI.getMenuLayout(renderer, menuBand, renderedMenuCount);
+
+  for (int column = 0; column < layout.columnCount; ++column) {
+    const int firstIndex = column * layout.rowsPerColumn;
+    const int rowsInColumn = std::min(layout.rowsPerColumn, renderedMenuCount - firstIndex);
+    if (rowsInColumn <= 0) {
+      break;
+    }
+
+    int menuRow = -1;
+    const auto menuTouch =
+        mappedInput.rowTouch(menuRow, menuBand.y, layout.rowStep, rowsInColumn, column * layout.columnWidth,
+                             (column + 1) * layout.columnWidth, layout.rowHeight);
+    if (menuTouch == MappedInputManager::RowTouch::None) {
+      continue;
+    }
+
+    const int menuIndex = firstIndex + menuRow;
     const int touchedIndex =
-        metrics.homeContinueReadingInMenu ? menuRow : menuRow + static_cast<int>(recentBooks.size());
+        metrics.homeContinueReadingInMenu ? menuIndex : menuIndex + static_cast<int>(recentBooks.size());
     if (menuTouch == MappedInputManager::RowTouch::Down) {
       if (selectorIndex != touchedIndex) {
         selectorIndex = touchedIndex;
@@ -292,7 +312,6 @@ void HomeActivity::loop() {
 void HomeActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
 
   renderer.clearScreen();
   bool bufferRestored = coverBufferStored && restoreCoverBuffer();
@@ -340,11 +359,7 @@ void HomeActivity::render(RenderLock&&) {
   }
 
   GUI.drawButtonMenu(
-      renderer,
-      Rect{0, metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset, pageWidth,
-           pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing +
-                         metrics.homeMenuTopOffset + metrics.buttonHintsHeight)},
-      static_cast<int>(menuItems.size()),
+      renderer, getMenuBandRect(), static_cast<int>(menuItems.size()),
       metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - recentBooks.size(),
       [&menuItems](int index) { return std::string(menuItems[index]); },
       [&menuIcons](int index) { return menuIcons[index]; });
