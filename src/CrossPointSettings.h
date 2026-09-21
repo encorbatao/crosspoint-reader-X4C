@@ -292,6 +292,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t bookDeliveryEnabled = 0;  // 0 = disabled, 1 = enabled
   uint8_t deliveryHour = 6;         // Local hour to fetch at (0-23)
   char bookDeliveryUrl[256] = "";   // URL serving the current EPUB
+  // Open the book in the reader as soon as a manual delivery succeeds, instead
+  // of returning to wherever the download was started from.
+  uint8_t openDeliveredBook = 0;  // 0 = disabled, 1 = enabled
   // On-disk filename format for OPDS downloads (0=Author-Title default, 1=Title-Author,
   // 2=Title). See OpdsFilenameFormat. Persisted via a category-less SettingInfo::Enum,
   // edited from the OPDS server list; hidden from the on-device Settings screen.

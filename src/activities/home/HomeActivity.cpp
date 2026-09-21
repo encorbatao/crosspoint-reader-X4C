@@ -30,7 +30,17 @@ int HomeActivity::getMenuItemCount() const {
   if (hasOpdsServers) {
     count++;
   }
+  if (hasBookDelivery) {
+    count++;
+  }
   return count;
+}
+
+Rect HomeActivity::getMenuBandRect() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int menuTop = metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset;
+
+  return Rect{0, menuTop, renderer.getScreenWidth(), renderer.getScreenHeight() - metrics.buttonHintsHeight - menuTop};
 }
 
 void HomeActivity::loadRecentBooks(int maxBooks) {
@@ -114,12 +124,17 @@ void HomeActivity::onEnter() {
   Activity::onEnter();
 
   hasOpdsServers = OPDS_STORE.hasServers();
+  // Same rule as the OPDS row: only offer the download once it is configured.
+  // The clock is not required here - BookDeliveryActivity syncs it itself.
+  hasBookDelivery = strlen(SETTINGS.bookDeliveryUrl) > 0;
 
   const auto& metrics = UITheme::getInstance().getMetrics();
   loadRecentBooks(metrics.homeRecentBooksCount);
 
   const auto base = static_cast<int>(recentBooks.size());
-  selectorIndex = initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem, hasOpdsServers);
+  selectorIndex = initialMenuItem == HomeMenuItem::NONE
+                      ? 0
+                      : base + menuItemToIndex(initialMenuItem, hasOpdsServers, hasBookDelivery);
 
   // Trigger first update
   requestUpdate();
@@ -178,7 +193,7 @@ void HomeActivity::loop() {
       return;
     }
     const int menuIndex = selectorIndex - static_cast<int>(recentBooks.size());
-    switch (indexToMenuItem(menuIndex, hasOpdsServers)) {
+    switch (indexToMenuItem(menuIndex, hasOpdsServers, hasBookDelivery)) {
       case HomeMenuItem::FILE_BROWSER:
         onFileBrowserOpen();
         break;
@@ -187,6 +202,9 @@ void HomeActivity::loop() {
         break;
       case HomeMenuItem::OPDS_BROWSER:
         onOpdsBrowserOpen();
+        break;
+      case HomeMenuItem::BOOK_DELIVERY:
+        onBookDeliveryOpen();
         break;
       case HomeMenuItem::FILE_TRANSFER:
         onFileTransferOpen();
@@ -249,18 +267,31 @@ void HomeActivity::loop() {
     return;
   }
 
-  const int menuTop = metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset;
+  const Rect menuBand = getMenuBandRect();
   const int renderedMenuCount =
       menuCount - (metrics.homeContinueReadingInMenu ? 0 : static_cast<int>(recentBooks.size()));
-  int menuRow = -1;
-  // Row height from the theme, not the metrics table: RoundedRaff draws
-  // font-derived rows and the touch grid must match the visuals exactly.
-  const int menuRowHeight = GUI.getMenuRowHeight(renderer);
-  const auto menuTouch = mappedInput.rowTouch(menuRow, menuTop, menuRowHeight + metrics.menuSpacing, renderedMenuCount,
-                                              0, INT32_MAX, menuRowHeight);
-  if (menuTouch != MappedInputManager::RowTouch::None) {
+  // Geometry from the theme, not the metrics table: RoundedRaff draws
+  // font-derived rows, and a menu too long for one column spills into a second.
+  const auto layout = GUI.getMenuLayout(renderer, menuBand, renderedMenuCount);
+
+  for (int column = 0; column < layout.columnCount; ++column) {
+    const int firstIndex = column * layout.rowsPerColumn;
+    const int rowsInColumn = std::min(layout.rowsPerColumn, renderedMenuCount - firstIndex);
+    if (rowsInColumn <= 0) {
+      break;
+    }
+
+    int menuRow = -1;
+    const auto menuTouch =
+        mappedInput.rowTouch(menuRow, menuBand.y, layout.rowStep, rowsInColumn, column * layout.columnWidth,
+                             (column + 1) * layout.columnWidth, layout.rowHeight);
+    if (menuTouch == MappedInputManager::RowTouch::None) {
+      continue;
+    }
+
+    const int menuIndex = firstIndex + menuRow;
     const int touchedIndex =
-        metrics.homeContinueReadingInMenu ? menuRow : menuRow + static_cast<int>(recentBooks.size());
+        metrics.homeContinueReadingInMenu ? menuIndex : menuIndex + static_cast<int>(recentBooks.size());
     if (menuTouch == MappedInputManager::RowTouch::Down) {
       if (selectorIndex != touchedIndex) {
         selectorIndex = touchedIndex;
@@ -281,7 +312,6 @@ void HomeActivity::loop() {
 void HomeActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
 
   renderer.clearScreen();
   bool bufferRestored = coverBufferStored && restoreCoverBuffer();
@@ -314,6 +344,14 @@ void HomeActivity::render(RenderLock&&) {
     menuIcons.insert(menuIcons.begin() + 2, Blocks);
   }
 
+  if (hasBookDelivery) {
+    // Sits right after the OPDS row when present, so the two network sources
+    // stay together above File Transfer.
+    const int deliveryIndex = hasOpdsServers ? 3 : 2;
+    menuItems.insert(menuItems.begin() + deliveryIndex, tr(STR_DOWNLOAD_NOW));
+    menuIcons.insert(menuIcons.begin() + deliveryIndex, Download);
+  }
+
   if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
     // Insert Continue Reading at the top if enabled in theme
     menuItems.insert(menuItems.begin(), tr(STR_CONTINUE_READING));
@@ -321,11 +359,7 @@ void HomeActivity::render(RenderLock&&) {
   }
 
   GUI.drawButtonMenu(
-      renderer,
-      Rect{0, metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset, pageWidth,
-           pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing +
-                         metrics.homeMenuTopOffset + metrics.buttonHintsHeight)},
-      static_cast<int>(menuItems.size()),
+      renderer, getMenuBandRect(), static_cast<int>(menuItems.size()),
       metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - recentBooks.size(),
       [&menuItems](int index) { return std::string(menuItems[index]); },
       [&menuIcons](int index) { return menuIcons[index]; });
@@ -356,3 +390,5 @@ void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
 void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
 
 void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }
+
+void HomeActivity::onBookDeliveryOpen() { activityManager.goToBookDelivery(); }

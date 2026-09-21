@@ -3,8 +3,8 @@
 #include <GfxRenderer.h>
 #include <HalClock.h>
 #include <HalStorage.h>
-#include <LibraryBuilder.h>
 #include <I18n.h>
+#include <LibraryBuilder.h>
 #include <Logging.h>
 #include <WiFi.h>
 
@@ -16,6 +16,7 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
+#include "SilentRestart.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -86,6 +87,7 @@ bool BookDeliveryActivity::downloadTodaysBook(const std::string& destPath) {
   // whole path works, and reporting a skip would prove nothing.
   if (trigger != DeliveryTrigger::Manual && Storage.exists(destPath.c_str())) {
     LOG_INF("DLV", "Already have today's book");
+    deliveredPath = destPath;
     return true;
   }
 
@@ -162,6 +164,7 @@ bool BookDeliveryActivity::downloadTodaysBook(const std::string& destPath) {
     return false;
   }
 
+  deliveredPath = destPath;
   return true;
 }
 
@@ -223,6 +226,21 @@ void BookDeliveryActivity::settle(const StrId message, const bool ok) {
   // what happened only when it failed, and otherwise get out of the way.
   if (trigger == DeliveryTrigger::CatchUp && ok) {
     finish();
+    return;
+  }
+
+  // Skip the result screen entirely and open the fresh book. Manual only: a
+  // catch-up must not decide what the device shows after a boot.
+  //
+  // Reboot into it rather than pushing the reader on top of a live network
+  // stack: the download leaves the WiFi driver holding its heap and the pool
+  // fragmented, and the reader is the hungriest activity in the firmware. The
+  // restart is the same one FontDownloadActivity and the OTA flow take, and
+  // e-ink holds the last frame until the reader paints.
+  if (trigger == DeliveryTrigger::Manual && ok && SETTINGS.openDeliveredBook && !deliveredPath.empty()) {
+    APP_STATE.openEpubPath = deliveredPath;
+    APP_STATE.saveToFile();
+    silentRestartToReader();
     return;
   }
 

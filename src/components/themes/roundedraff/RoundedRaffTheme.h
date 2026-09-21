@@ -91,6 +91,10 @@ class RoundedRaffTheme : public BaseTheme {
                            int selectorIndex, bool& coverRendered, bool& coverBufferStored, bool& bufferRestored,
                            std::function<bool()> storeCoverBuffer) const override;
   int getMenuRowHeight(const GfxRenderer& renderer) const override;
+  // This theme pages its menu instead of spilling into a second column; the
+  // override keeps HomeActivity's touch grid on the geometry drawButtonMenu
+  // actually uses.
+  MenuLayout getMenuLayout(const GfxRenderer& renderer, Rect rect, int buttonCount) const override;
   void drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                       const std::function<std::string(int index)>& buttonLabel,
                       const std::function<UIIcon(int index)>& rowIcon) const override;

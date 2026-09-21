@@ -666,30 +666,62 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
 
 int BaseTheme::getMenuRowHeight(const GfxRenderer&) const { return UITheme::getInstance().getMetrics().menuRowHeight; }
 
+// Two columns at most: a third would leave labels too narrow to read on the
+// narrow edge of the panel, and the home menu has no more entries than that.
+static constexpr int MAX_MENU_COLUMNS = 2;
+
+BaseTheme::MenuLayout BaseTheme::getMenuLayout(const GfxRenderer& renderer, const Rect rect,
+                                               const int buttonCount) const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  MenuLayout layout{};
+  layout.rowHeight = getMenuRowHeight(renderer);
+  layout.rowStep = layout.rowHeight + metrics.menuSpacing;
+  const int fittingRows = std::max(1, rect.height / layout.rowStep);
+
+  // Rows navigation can reach must be drawn, even where the band is too short
+  // for them (landscape, with a cover tile sized for portrait): spilling past
+  // the band is recoverable, selecting an invisible row is not.
+  const int rowsToPlaceAll = (std::max(1, buttonCount) + MAX_MENU_COLUMNS - 1) / MAX_MENU_COLUMNS;
+  layout.rowsPerColumn = std::max(fittingRows, rowsToPlaceAll);
+
+  // Round up, so the overflow decides the column count rather than the tail
+  // being silently dropped off the bottom of the band.
+  const int neededColumns = (std::max(1, buttonCount) + layout.rowsPerColumn - 1) / layout.rowsPerColumn;
+  layout.columnCount = std::clamp(neededColumns, 1, MAX_MENU_COLUMNS);
+  layout.columnWidth = rect.width / layout.columnCount;
+
+  return layout;
+}
+
 void BaseTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                                const std::function<std::string(int index)>& buttonLabel,
                                const std::function<UIIcon(int index)>& rowIcon) const {
+  const MenuLayout layout = getMenuLayout(renderer, rect, buttonCount);
+
   for (int i = 0; i < buttonCount; ++i) {
-    const int tileY = BaseMetrics::values.verticalSpacing + rect.y +
-                      static_cast<int>(i) * (BaseMetrics::values.menuRowHeight + BaseMetrics::values.menuSpacing);
+    const int column = i / layout.rowsPerColumn;
+    const int row = i % layout.rowsPerColumn;
+    const int tileX = rect.x + column * layout.columnWidth + BaseMetrics::values.contentSidePadding;
+    const int tileWidth = layout.columnWidth - BaseMetrics::values.contentSidePadding * 2;
+    const int tileY = rect.y + row * layout.rowStep;
 
     const bool selected = selectedIndex == i;
 
     if (selected) {
-      renderer.fillRect(rect.x + BaseMetrics::values.contentSidePadding, tileY,
-                        rect.width - BaseMetrics::values.contentSidePadding * 2, BaseMetrics::values.menuRowHeight);
+      renderer.fillRect(tileX, tileY, tileWidth, layout.rowHeight);
     } else {
-      renderer.drawRect(rect.x + BaseMetrics::values.contentSidePadding, tileY,
-                        rect.width - BaseMetrics::values.contentSidePadding * 2, BaseMetrics::values.menuRowHeight);
+      renderer.drawRect(tileX, tileY, tileWidth, layout.rowHeight);
     }
 
-    std::string labelStr = buttonLabel(i);
+    // A two-column menu leaves half the width per label; clip rather than let
+    // a long one bleed into the neighbouring column.
+    const std::string labelStr =
+        renderer.truncatedText(UI_10_FONT_ID, buttonLabel(i).c_str(), tileWidth - BaseMetrics::values.menuSpacing * 2);
     const char* label = labelStr.c_str();
     const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, label);
-    const int textX = rect.x + (rect.width - textWidth) / 2;
+    const int textX = tileX + (tileWidth - textWidth) / 2;
     const int lineHeight = renderer.getLineHeight(UI_10_FONT_ID);
-    const int textY =
-        tileY + (BaseMetrics::values.menuRowHeight - lineHeight) / 2;  // vertically centered assuming y is top of text
+    const int textY = tileY + (layout.rowHeight - lineHeight) / 2;  // y is the top of the text
     // Invert text when the tile is selected, to contrast with the filled background
     renderer.drawText(UI_10_FONT_ID, textX, textY, label, selectedIndex != i);
   }
