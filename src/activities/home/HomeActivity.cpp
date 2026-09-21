@@ -30,6 +30,9 @@ int HomeActivity::getMenuItemCount() const {
   if (hasOpdsServers) {
     count++;
   }
+  if (hasBookDelivery) {
+    count++;
+  }
   return count;
 }
 
@@ -114,12 +117,17 @@ void HomeActivity::onEnter() {
   Activity::onEnter();
 
   hasOpdsServers = OPDS_STORE.hasServers();
+  // Same rule as the OPDS row: only offer the download once it is configured.
+  // The clock is not required here - BookDeliveryActivity syncs it itself.
+  hasBookDelivery = strlen(SETTINGS.bookDeliveryUrl) > 0;
 
   const auto& metrics = UITheme::getInstance().getMetrics();
   loadRecentBooks(metrics.homeRecentBooksCount);
 
   const auto base = static_cast<int>(recentBooks.size());
-  selectorIndex = initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem, hasOpdsServers);
+  selectorIndex = initialMenuItem == HomeMenuItem::NONE
+                      ? 0
+                      : base + menuItemToIndex(initialMenuItem, hasOpdsServers, hasBookDelivery);
 
   // Trigger first update
   requestUpdate();
@@ -178,7 +186,7 @@ void HomeActivity::loop() {
       return;
     }
     const int menuIndex = selectorIndex - static_cast<int>(recentBooks.size());
-    switch (indexToMenuItem(menuIndex, hasOpdsServers)) {
+    switch (indexToMenuItem(menuIndex, hasOpdsServers, hasBookDelivery)) {
       case HomeMenuItem::FILE_BROWSER:
         onFileBrowserOpen();
         break;
@@ -187,6 +195,9 @@ void HomeActivity::loop() {
         break;
       case HomeMenuItem::OPDS_BROWSER:
         onOpdsBrowserOpen();
+        break;
+      case HomeMenuItem::BOOK_DELIVERY:
+        onBookDeliveryOpen();
         break;
       case HomeMenuItem::FILE_TRANSFER:
         onFileTransferOpen();
@@ -314,6 +325,14 @@ void HomeActivity::render(RenderLock&&) {
     menuIcons.insert(menuIcons.begin() + 2, Blocks);
   }
 
+  if (hasBookDelivery) {
+    // Sits right after the OPDS row when present, so the two network sources
+    // stay together above File Transfer.
+    const int deliveryIndex = hasOpdsServers ? 3 : 2;
+    menuItems.insert(menuItems.begin() + deliveryIndex, tr(STR_DOWNLOAD_NOW));
+    menuIcons.insert(menuIcons.begin() + deliveryIndex, Download);
+  }
+
   if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
     // Insert Continue Reading at the top if enabled in theme
     menuItems.insert(menuItems.begin(), tr(STR_CONTINUE_READING));
@@ -356,3 +375,5 @@ void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
 void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
 
 void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }
+
+void HomeActivity::onBookDeliveryOpen() { activityManager.goToBookDelivery(); }

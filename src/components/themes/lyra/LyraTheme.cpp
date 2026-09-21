@@ -58,6 +58,9 @@ const uint8_t* iconForName(UIIcon icon) {
       return BookmarkIcon;
     case UIIcon::Blocks:
       return BlocksIcon;
+    // Lyra ships no download glyph; the transfer arrow is the closest match.
+    case UIIcon::Download:
+      return TransferIcon;
     default:
       return nullptr;
   }

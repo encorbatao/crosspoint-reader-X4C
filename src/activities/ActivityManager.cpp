@@ -14,6 +14,7 @@
 #include "boot_sleep/BootActivity.h"
 #include "boot_sleep/SleepActivity.h"
 #include "browser/OpdsBookBrowserActivity.h"
+#include "delivery/BookDeliveryActivity.h"
 #include "home/CrashActivity.h"
 #include "home/FileBrowserActivity.h"
 #include "home/HomeActivity.h"
@@ -266,6 +267,15 @@ void ActivityManager::goToBrowser() {
   } else {
     replaceActivity(std::make_unique<OpdsServerListActivity>(renderer, mappedInput, true));
   }
+}
+
+void ActivityManager::goToBookDelivery() {
+  auto activity = makeUniqueNoThrow<BookDeliveryActivity>(renderer, mappedInput, DeliveryTrigger::Manual);
+  if (!activity) {
+    LOG_ERR("ACT", "OOM: book delivery activity");
+    return;
+  }
+  replaceActivity(std::move(activity));
 }
 
 void ActivityManager::goToReader(std::string path, const bool allowFastInitialRefresh) {
